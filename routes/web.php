@@ -9,13 +9,13 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return Inertia::render('Dashboard');
-});
+use App\Http\Controllers\DashboardController;
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->name('dashboard');
+Route::get('/', [DashboardController::class, 'index'])->middleware(['auth', 'verified']);
+
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 // Authentication Routes
 Route::get('/login', function () {
@@ -30,7 +30,15 @@ Route::get('/forgot-password', function () {
     return Inertia::render('Auth/ForgotPassword');
 })->name('password.request');
 
+// Auth Action Routes
+use App\Modules\Auth\Controllers\AuthController;
+Route::post('/login', [AuthController::class, 'loginWeb']);
+Route::post('/register', [AuthController::class, 'registerWeb']);
+Route::post('/forgot-password', [AuthController::class, 'forgotPasswordWeb'])->name('password.email');
+Route::post('/logout', [AuthController::class, 'logoutWeb'])->name('logout');
+
 // Manufacturing Module
+use App\Http\Controllers\Manufacturing\WorkOrderController;
 Route::get('/manufacturing', function () {
     return Inertia::render('Manufacturing/Index');
 })->name('manufacturing.index');
@@ -39,9 +47,13 @@ Route::get('/manufacturing/bom', function () {
     return Inertia::render('Manufacturing/BOM');
 })->name('manufacturing.bom');
 
-Route::get('/manufacturing/work-orders', function () {
-    return Inertia::render('Manufacturing/WorkOrders');
-})->name('manufacturing.work-orders');
+// Work Orders (Resource Routes)
+Route::get('/manufacturing/work-orders', [WorkOrderController::class, 'index'])->name('manufacturing.work-orders');
+Route::get('/manufacturing/work-orders/create', [WorkOrderController::class, 'create'])->name('manufacturing.work-orders.create');
+Route::post('/manufacturing/work-orders', [WorkOrderController::class, 'store'])->name('manufacturing.work-orders.store');
+Route::get('/manufacturing/work-orders/{id}', [WorkOrderController::class, 'show'])->name('manufacturing.work-orders.show');
+Route::post('/manufacturing/work-orders/{id}/release', [WorkOrderController::class, 'release'])->name('manufacturing.work-orders.release');
+Route::post('/manufacturing/work-orders/{id}/start', [WorkOrderController::class, 'start'])->name('manufacturing.work-orders.start');
 
 Route::get('/manufacturing/production', function () {
     return Inertia::render('Manufacturing/Production');

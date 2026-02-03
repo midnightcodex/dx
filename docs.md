@@ -906,6 +906,32 @@ GET    /api/manufacturing/work-orders/{id}/material-shortage
 - Backflushing option: auto-issue materials on completion
 - Costing: actual vs standard cost tracking
 
+**Work Order Lifecycle:**
+
+```mermaid
+stateDiagram-v2
+    [*] --> PLANNED: Create WO
+    PLANNED --> RELEASED: Release for Production
+    PLANNED --> CANCELLED: Cancel
+    RELEASED --> IN_PROGRESS: Start Production / Issue Materials
+    RELEASED --> CANCELLED: Cancel (if no materials issued)
+    IN_PROGRESS --> COMPLETED: Record Output (qty = planned)
+    IN_PROGRESS --> IN_PROGRESS: Partial Output
+    COMPLETED --> [*]
+    CANCELLED --> [*]
+```
+
+| Status | Description | Allowed Actions |
+|--------|-------------|-----------------|
+| `PLANNED` | Created, awaiting review | Edit, Release, Cancel |
+| `RELEASED` | Approved for production, materials can be allocated | Start, Issue Materials, Cancel |
+| `IN_PROGRESS` | Production ongoing, materials issued | Record Output, Complete |
+| `COMPLETED` | All planned quantity produced | View Only |
+| `CANCELLED` | Cancelled before completion | View Only |
+
+> [!IMPORTANT]
+> Once materials are issued (IN_PROGRESS), the work order cannot be cancelled without creating adjustment transactions to return issued materials.
+
 **Business Logic:**
 
 ```php

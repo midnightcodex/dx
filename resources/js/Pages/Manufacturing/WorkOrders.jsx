@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link, router, useForm } from '@inertiajs/react';
 import '../../styles/dashboard.css';
 import MainLayout from '../../Components/Layout/MainLayout';
 import StatsCard from '../../Components/Dashboard/StatsCard';
@@ -8,22 +9,15 @@ import Modal from '../../Components/UI/Modal';
 import Input from '../../Components/UI/Input';
 import Select from '../../Components/UI/Select';
 
-const workOrderData = [
-    { id: 1, woNumber: 'WO-2026-001', product: 'Steel Brackets A1', bom: 'BOM-001', quantity: 500, completed: 320, status: 'In Progress', priority: 'High', startDate: '2026-02-01', dueDate: '2026-02-05' },
-    { id: 2, woNumber: 'WO-2026-002', product: 'Aluminum Plates B2', bom: 'BOM-002', quantity: 1000, completed: 0, status: 'Pending', priority: 'Medium', startDate: '2026-02-03', dueDate: '2026-02-08' },
-    { id: 3, woNumber: 'WO-2026-003', product: 'Copper Connectors', bom: 'BOM-003', quantity: 250, completed: 250, status: 'Completed', priority: 'Low', startDate: '2026-01-28', dueDate: '2026-02-01' },
-    { id: 4, woNumber: 'WO-2026-004', product: 'Plastic Housings', bom: 'BOM-004', quantity: 750, completed: 450, status: 'In Progress', priority: 'High', startDate: '2026-02-01', dueDate: '2026-02-06' },
-];
-
 const columns = [
     { header: 'WO Number', accessor: 'woNumber' },
     { header: 'Product', accessor: 'product' },
-    { header: 'Quantity', accessor: 'quantity', render: (val) => val.toLocaleString() },
+    { header: 'Quantity', accessor: 'quantity', render: (val) => val?.toLocaleString() },
     {
         header: 'Progress',
-        accessor: 'completed',
+        accessor: 'completedQuantity',
         render: (val, row) => {
-            const pct = Math.round((val / row.quantity) * 100);
+            const pct = row.quantity > 0 ? Math.round((val / row.quantity) * 100) : 0;
             return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '60px', height: '6px', backgroundColor: 'var(--color-gray-200)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -34,99 +28,95 @@ const columns = [
             );
         }
     },
-    {
-        header: 'Priority',
-        accessor: 'priority',
-        render: (val) => {
-            const colors = { 'Critical': '#DC2626', 'High': '#F59E0B', 'Medium': '#3B82F6', 'Low': '#6B7280' };
-            return <span style={{ color: colors[val], fontWeight: 500 }}>● {val}</span>;
-        }
-    },
-    { header: 'Due Date', accessor: 'dueDate' },
+    { header: 'Scheduled', accessor: 'scheduledStart' },
     {
         header: 'Status',
         accessor: 'status',
-        render: (val) => {
+        render: (val, row) => {
             const colors = {
+                'Planned': { bg: '#E0E7FF', color: '#4338CA' },
+                'Released': { bg: '#FEF3C7', color: '#D97706' },
                 'In Progress': { bg: '#DBEAFE', color: '#1D4ED8' },
-                'Pending': { bg: '#FEF3C7', color: '#D97706' },
                 'Completed': { bg: '#D1FAE5', color: '#059669' },
+                'Cancelled': { bg: '#FEE2E2', color: '#DC2626' },
             };
             const style = colors[val] || { bg: '#F3F4F6', color: '#6B7280' };
             return <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, backgroundColor: style.bg, color: style.color }}>{val}</span>;
         }
     },
+    {
+        header: 'Actions',
+        accessor: 'id',
+        render: (id, row) => (
+            <div style={{ display: 'flex', gap: '8px' }}>
+                {row.rawStatus === 'PLANNED' && (
+                    <button
+                        onClick={() => router.post(`/manufacturing/work-orders/${id}/release`)}
+                        style={{ padding: '4px 10px', fontSize: '12px', backgroundColor: '#10B981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                        Release
+                    </button>
+                )}
+                {row.rawStatus === 'RELEASED' && (
+                    <button
+                        onClick={() => router.post(`/manufacturing/work-orders/${id}/start`)}
+                        style={{ padding: '4px 10px', fontSize: '12px', backgroundColor: '#3B82F6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                        Start
+                    </button>
+                )}
+                <Link href={`/manufacturing/work-orders/${id}`} style={{ padding: '4px 10px', fontSize: '12px', backgroundColor: '#6B7280', color: 'white', borderRadius: '4px', textDecoration: 'none' }}>
+                    View
+                </Link>
+            </div>
+        )
+    }
 ];
 
-export default function WorkOrders() {
-    const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({ product: '', bom: '', quantity: '', priority: '', startDate: '', dueDate: '' });
+export default function WorkOrders({ workOrders, filters }) {
+    const allOrders = workOrders?.data || [];
 
-    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleSubmit = () => {
-        alert('Work Order Created!\n' + JSON.stringify(formData, null, 2));
-        setShowModal(false);
-        setFormData({ product: '', bom: '', quantity: '', priority: '', startDate: '', dueDate: '' });
-    };
-
-    const inProgress = workOrderData.filter(wo => wo.status === 'In Progress');
-    const pending = workOrderData.filter(wo => wo.status === 'Pending');
-    const completed = workOrderData.filter(wo => wo.status === 'Completed');
+    // Stats
+    const planned = allOrders.filter(wo => wo.rawStatus === 'PLANNED');
+    const released = allOrders.filter(wo => wo.rawStatus === 'RELEASED');
+    const inProgress = allOrders.filter(wo => wo.rawStatus === 'IN_PROGRESS');
+    const completed = allOrders.filter(wo => wo.rawStatus === 'COMPLETED');
 
     const tabs = [
-        { label: 'All Orders', content: <DataTable columns={columns} data={workOrderData} /> },
-        { label: 'In Progress', badge: inProgress.length, content: <DataTable columns={columns} data={inProgress} /> },
-        { label: 'Pending', badge: pending.length, content: <DataTable columns={columns} data={pending} /> },
-        { label: 'Completed', content: <DataTable columns={columns} data={completed} /> },
+        { label: 'All Orders', content: <DataTable columns={columns} data={allOrders} actions={false} /> },
+        { label: 'Planned', badge: planned.length, content: <DataTable columns={columns} data={planned} actions={false} /> },
+        { label: 'Released', badge: released.length, content: <DataTable columns={columns} data={released} actions={false} /> },
+        { label: 'In Progress', badge: inProgress.length, content: <DataTable columns={columns} data={inProgress} actions={false} /> },
+        { label: 'Completed', content: <DataTable columns={columns} data={completed} actions={false} /> },
     ];
 
     return (
         <MainLayout title="Work Orders" subtitle="Manage production work orders">
             <div className="stats-grid">
-                <StatsCard icon="📋" value={workOrderData.length} label="Total Work Orders" variant="primary" />
-                <StatsCard icon="🔄" value={inProgress.length} label="In Progress" variant="primary" />
-                <StatsCard icon="⏳" value={pending.length} label="Pending Start" variant="warning" />
+                <StatsCard icon="📋" value={allOrders.length} label="Total Work Orders" variant="primary" />
+                <StatsCard icon="📝" value={planned.length} label="Planned" variant="default" />
+                <StatsCard icon="🔄" value={inProgress.length + released.length} label="Active" variant="warning" />
                 <StatsCard icon="✅" value={completed.length} label="Completed" variant="success" />
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-                <button onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 500, cursor: 'pointer', fontSize: '14px' }}>
+                <Link
+                    href="/manufacturing/work-orders/create"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 500, cursor: 'pointer', fontSize: '14px', textDecoration: 'none' }}
+                >
                     ➕ Create Work Order
-                </button>
-                <button style={{ padding: '12px 20px', borderRadius: '8px', border: '1px solid var(--color-gray-200)', backgroundColor: 'var(--color-white)', fontWeight: 500, cursor: 'pointer', fontSize: '14px' }}>
-                    📤 Export
-                </button>
+                </Link>
             </div>
 
             <Tabs tabs={tabs} />
 
-            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Create Work Order" size="lg" footer={
-                <>
-                    <button onClick={() => setShowModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--color-gray-200)', backgroundColor: 'var(--color-white)', cursor: 'pointer' }}>Cancel</button>
-                    <button onClick={handleSubmit} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontWeight: 500 }}>Create Work Order</button>
-                </>
-            }>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <Select label="Product" name="product" value={formData.product} onChange={handleInputChange} required options={[
-                        { value: 'steel-brackets', label: 'Steel Brackets A1' },
-                        { value: 'aluminum-plates', label: 'Aluminum Plates B2' },
-                        { value: 'copper-connectors', label: 'Copper Connectors' },
-                    ]} />
-                    <Select label="BOM Version" name="bom" value={formData.bom} onChange={handleInputChange} required options={[
-                        { value: 'bom-001', label: 'BOM-001 (Rev 3)' },
-                        { value: 'bom-002', label: 'BOM-002 (Rev 2)' },
-                    ]} />
-                    <Input label="Quantity" type="number" name="quantity" value={formData.quantity} onChange={handleInputChange} required placeholder="Enter quantity" />
-                    <Select label="Priority" name="priority" value={formData.priority} onChange={handleInputChange} required options={[
-                        { value: 'critical', label: '🔴 Critical' },
-                        { value: 'high', label: '🟠 High' },
-                        { value: 'medium', label: '🔵 Medium' },
-                        { value: 'low', label: '⚪ Low' },
-                    ]} />
-                    <Input label="Start Date" type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} required />
-                    <Input label="Due Date" type="date" name="dueDate" value={formData.dueDate} onChange={handleInputChange} required />
+            {allOrders.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '48px', color: 'var(--color-gray-500)' }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📝</span>
+                    <p>No work orders yet. Create your first one!</p>
                 </div>
-            </Modal>
+            )}
         </MainLayout>
     );
 }
+

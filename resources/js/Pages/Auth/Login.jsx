@@ -11,8 +11,7 @@ export default function Login() {
 
     const submit = (e) => {
         e.preventDefault();
-        console.log('Login attempt', data);
-        // post(route('login')); 
+        post('/login');
     };
 
     return (

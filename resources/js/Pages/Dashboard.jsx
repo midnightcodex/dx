@@ -84,19 +84,20 @@ const inventoryColumns = [
     },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({ stats, tables }) {
     const tabs = [
         {
             label: 'Work Orders',
-            content: <DataTable columns={workOrderColumns} data={workOrderData} title="Active Work Orders" />
+            content: <DataTable columns={workOrderColumns} data={tables.workOrders} title="Recent Work Orders" actions={false} />
         },
         {
             label: 'Inventory',
-            content: <DataTable columns={inventoryColumns} data={inventoryData} title="Stock Levels" />
+            content: <DataTable columns={inventoryColumns} data={tables.inventory} title="Recent Items" actions={false} />
         },
+        // ... keeping other tabs as placeholders for now ...
         {
             label: 'Quality Inspections',
-            badge: 3,
+            badge: stats.qualityIssues,
             content: (
                 <div style={{
                     textAlign: 'center',
@@ -104,7 +105,7 @@ export default function Dashboard() {
                     color: 'var(--color-gray-500)'
                 }}>
                     <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔍</span>
-                    <p>3 inspections pending review</p>
+                    <p>{stats.qualityIssues} inspections pending review</p>
                 </div>
             )
         },
@@ -126,42 +127,42 @@ export default function Dashboard() {
     return (
         <MainLayout
             title="Manufacturing Dashboard"
-            subtitle="Monitor production, inventory, and operations"
+            subtitle="Real-time production and inventory overview"
         >
             {/* Stats Cards */}
             <div className="stats-grid">
                 <StatsCard
                     icon="⚙️"
-                    value={24}
+                    value={stats.activeWorkOrders}
                     label="Active Work Orders"
-                    trend="12% more than last month"
-                    trendDirection="up"
+                    trend="Real-time"
+                    trendDirection="neutral"
                     variant="primary"
                     animationDelay={0}
                 />
                 <StatsCard
                     icon="📦"
-                    value="1,847"
-                    label="Inventory Items in Stock"
-                    trend="5% more than last month"
-                    trendDirection="up"
+                    value={stats.totalItems}
+                    label="Total Items"
+                    trend="In Database"
+                    trendDirection="neutral"
                     variant="success"
                     animationDelay={100}
                 />
                 <StatsCard
                     icon="🛒"
-                    value={12}
-                    label="Pending Purchase Orders"
-                    trend="3% less than last month"
-                    trendDirection="down"
+                    value={stats.pendingPOs}
+                    label="Pending POs"
+                    trend=" Procurement"
+                    trendDirection="neutral"
                     variant="warning"
                     animationDelay={200}
                 />
                 <StatsCard
                     icon="⚠️"
-                    value={3}
-                    label="Open Quality Issues"
-                    trend="25% less than last month"
+                    value={stats.qualityIssues}
+                    label="Quality Issues"
+                    trend="Requires Attention"
                     trendDirection="down"
                     variant="danger"
                     animationDelay={300}
@@ -170,7 +171,7 @@ export default function Dashboard() {
 
             {/* Chart Section */}
             <div className="dashboard-grid">
-                <PayrollChart title="Annual Production Summary" />
+                <PayrollChart title="Production Output (Projected)" />
 
                 {/* Quick Actions Card */}
                 <div className="chart-container">
@@ -185,18 +186,18 @@ export default function Dashboard() {
                         />
                         <QuickActionCard
                             icon="📦"
-                            title="Receive Stock"
-                            description="Process GRN"
+                            title="New Item"
+                            description="Register inventory"
                         />
                         <QuickActionCard
                             icon="🔍"
-                            title="Quality Check"
-                            description="Inspect batch"
+                            title="Stock Check"
+                            description="Audit warehouse"
                         />
                         <QuickActionCard
                             icon="📊"
-                            title="View Reports"
-                            description="Analytics dashboard"
+                            title="Reports"
+                            description="View analytics"
                         />
                     </div>
                 </div>
