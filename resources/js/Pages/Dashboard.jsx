@@ -1,76 +1,239 @@
+import '../styles/dashboard.css';
+import MainLayout from '../Components/Layout/MainLayout';
+import StatsCard from '../Components/Dashboard/StatsCard';
+import PayrollChart from '../Components/Dashboard/PayrollChart';
+import DataTable from '../Components/Dashboard/DataTable';
+import Tabs from '../Components/UI/Tabs';
+
+// Sample data for the work orders table
+const workOrderData = [
+    { id: 1, woNumber: 'WO-2026-001', product: 'Steel Brackets', quantity: 500, status: 'In Progress', startDate: '2026-02-01' },
+    { id: 2, woNumber: 'WO-2026-002', product: 'Aluminum Plates', quantity: 1000, status: 'Pending', startDate: '2026-02-02' },
+    { id: 3, woNumber: 'WO-2026-003', product: 'Copper Wires', quantity: 250, status: 'Completed', startDate: '2026-01-30' },
+    { id: 4, woNumber: 'WO-2026-004', product: 'Plastic Housings', quantity: 750, status: 'In Progress', startDate: '2026-02-01' },
+    { id: 5, woNumber: 'WO-2026-005', product: 'Electronic PCBs', quantity: 200, status: 'Quality Check', startDate: '2026-01-29' },
+];
+
+const workOrderColumns = [
+    { header: 'S/N', accessor: 'id' },
+    { header: 'WO Number', accessor: 'woNumber' },
+    { header: 'Product', accessor: 'product' },
+    { header: 'Quantity', accessor: 'quantity', render: (val) => val.toLocaleString() },
+    {
+        header: 'Status',
+        accessor: 'status',
+        render: (val) => {
+            const statusColors = {
+                'In Progress': { bg: '#DBEAFE', color: '#1D4ED8' },
+                'Pending': { bg: '#FEF3C7', color: '#D97706' },
+                'Completed': { bg: '#D1FAE5', color: '#059669' },
+                'Quality Check': { bg: '#EDE9FE', color: '#7C3AED' },
+            };
+            const style = statusColors[val] || { bg: '#F3F4F6', color: '#6B7280' };
+            return (
+                <span style={{
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    backgroundColor: style.bg,
+                    color: style.color
+                }}>
+                    {val}
+                </span>
+            );
+        }
+    },
+    { header: 'Start Date', accessor: 'startDate' },
+];
+
+// Inventory data for second tab
+const inventoryData = [
+    { id: 1, itemCode: 'RM-001', name: 'Raw Steel', warehouse: 'Main', quantity: 5000, unit: 'kg', reorderLevel: 1000 },
+    { id: 2, itemCode: 'RM-002', name: 'Aluminum Sheets', warehouse: 'Main', quantity: 2500, unit: 'sheets', reorderLevel: 500 },
+    { id: 3, itemCode: 'RM-003', name: 'Copper Wire 2mm', warehouse: 'Production', quantity: 800, unit: 'm', reorderLevel: 200 },
+    { id: 4, itemCode: 'FG-001', name: 'Steel Brackets A1', warehouse: 'Finished Goods', quantity: 1200, unit: 'pcs', reorderLevel: 300 },
+    { id: 5, itemCode: 'FG-002', name: 'Aluminum Plates B2', warehouse: 'Finished Goods', quantity: 450, unit: 'pcs', reorderLevel: 100 },
+];
+
+const inventoryColumns = [
+    { header: 'S/N', accessor: 'id' },
+    { header: 'Item Code', accessor: 'itemCode' },
+    { header: 'Name', accessor: 'name' },
+    { header: 'Warehouse', accessor: 'warehouse' },
+    { header: 'Quantity', accessor: 'quantity', render: (val) => val.toLocaleString() },
+    { header: 'Unit', accessor: 'unit' },
+    {
+        header: 'Stock Status',
+        accessor: 'quantity',
+        render: (val, row) => {
+            const isLow = val <= row.reorderLevel;
+            return (
+                <span style={{
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    backgroundColor: isLow ? '#FEE2E2' : '#D1FAE5',
+                    color: isLow ? '#DC2626' : '#059669'
+                }}>
+                    {isLow ? 'Low Stock' : 'In Stock'}
+                </span>
+            );
+        }
+    },
+];
+
 export default function Dashboard() {
+    const tabs = [
+        {
+            label: 'Work Orders',
+            content: <DataTable columns={workOrderColumns} data={workOrderData} title="Active Work Orders" />
+        },
+        {
+            label: 'Inventory',
+            content: <DataTable columns={inventoryColumns} data={inventoryData} title="Stock Levels" />
+        },
+        {
+            label: 'Quality Inspections',
+            badge: 3,
+            content: (
+                <div style={{
+                    textAlign: 'center',
+                    padding: '48px',
+                    color: 'var(--color-gray-500)'
+                }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔍</span>
+                    <p>3 inspections pending review</p>
+                </div>
+            )
+        },
+        {
+            label: 'Maintenance',
+            content: (
+                <div style={{
+                    textAlign: 'center',
+                    padding: '48px',
+                    color: 'var(--color-gray-500)'
+                }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔧</span>
+                    <p>All equipment operational</p>
+                </div>
+            )
+        },
+    ];
+
     return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        SME Manufacturing ERP
-                    </h1>
-                    <p className="mt-4 text-xl text-gray-400">
-                        Welcome to your manufacturing operations dashboard
-                    </p>
-                </div>
+        <MainLayout
+            title="Manufacturing Dashboard"
+            subtitle="Monitor production, inventory, and operations"
+        >
+            {/* Stats Cards */}
+            <div className="stats-grid">
+                <StatsCard
+                    icon="⚙️"
+                    value={24}
+                    label="Active Work Orders"
+                    trend="12% more than last month"
+                    trendDirection="up"
+                    variant="primary"
+                    animationDelay={0}
+                />
+                <StatsCard
+                    icon="📦"
+                    value="1,847"
+                    label="Inventory Items in Stock"
+                    trend="5% more than last month"
+                    trendDirection="up"
+                    variant="success"
+                    animationDelay={100}
+                />
+                <StatsCard
+                    icon="🛒"
+                    value={12}
+                    label="Pending Purchase Orders"
+                    trend="3% less than last month"
+                    trendDirection="down"
+                    variant="warning"
+                    animationDelay={200}
+                />
+                <StatsCard
+                    icon="⚠️"
+                    value={3}
+                    label="Open Quality Issues"
+                    trend="25% less than last month"
+                    trendDirection="down"
+                    variant="danger"
+                    animationDelay={300}
+                />
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    <DashboardCard
-                        title="Work Orders"
-                        value="24"
-                        subtitle="Active today"
-                        color="blue"
-                    />
-                    <DashboardCard
-                        title="Inventory Items"
-                        value="1,847"
-                        subtitle="In stock"
-                        color="green"
-                    />
-                    <DashboardCard
-                        title="Purchase Orders"
-                        value="12"
-                        subtitle="Pending approval"
-                        color="yellow"
-                    />
-                    <DashboardCard
-                        title="Quality Issues"
-                        value="3"
-                        subtitle="Open NCRs"
-                        color="red"
-                    />
-                </div>
+            {/* Chart Section */}
+            <div className="dashboard-grid">
+                <PayrollChart title="Annual Production Summary" />
 
-                <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                    <h2 className="text-xl font-semibold mb-4">🚀 Inertia.js + React Setup Complete!</h2>
-                    <p className="text-gray-400 mb-4">
-                        Your Laravel + React SPA is ready. The stack includes:
-                    </p>
-                    <ul className="list-disc list-inside text-gray-400 space-y-2">
-                        <li>Laravel 12.49.0 (Backend APIs)</li>
-                        <li>Inertia.js v2 (SPA Bridge)</li>
-                        <li>React 18+ (Frontend UI)</li>
-                        <li>Vite (Build Tool)</li>
-                    </ul>
+                {/* Quick Actions Card */}
+                <div className="chart-container">
+                    <div className="chart-header">
+                        <h3 className="chart-title">Quick Actions</h3>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <QuickActionCard
+                            icon="📝"
+                            title="Create Work Order"
+                            description="Start new production"
+                        />
+                        <QuickActionCard
+                            icon="📦"
+                            title="Receive Stock"
+                            description="Process GRN"
+                        />
+                        <QuickActionCard
+                            icon="🔍"
+                            title="Quality Check"
+                            description="Inspect batch"
+                        />
+                        <QuickActionCard
+                            icon="📊"
+                            title="View Reports"
+                            description="Analytics dashboard"
+                        />
+                    </div>
                 </div>
             </div>
-        </div>
+
+            {/* Tabs with Tables */}
+            <Tabs tabs={tabs} />
+        </MainLayout>
     );
 }
 
-function DashboardCard({ title, value, subtitle, color }) {
-    const colorClasses = {
-        blue: 'from-blue-500 to-blue-600',
-        green: 'from-green-500 to-green-600',
-        yellow: 'from-yellow-500 to-yellow-600',
-        red: 'from-red-500 to-red-600',
-    };
-
+function QuickActionCard({ icon, title, description }) {
     return (
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 hover:border-gray-600 transition-colors">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-gray-400 text-sm font-medium">{title}</h3>
-                <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${colorClasses[color]}`}></div>
+        <div style={{
+            padding: '16px',
+            borderRadius: '12px',
+            border: '1px solid var(--color-gray-200)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            backgroundColor: 'var(--color-white)'
+        }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
+                e.currentTarget.style.borderColor = 'var(--color-primary)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'var(--color-white)';
+                e.currentTarget.style.borderColor = 'var(--color-gray-200)';
+            }}
+        >
+            <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>{icon}</span>
+            <div style={{ fontWeight: 600, color: 'var(--color-gray-900)', marginBottom: '4px' }}>
+                {title}
             </div>
-            <p className="text-3xl font-bold text-white">{value}</p>
-            <p className="text-gray-500 text-sm mt-1">{subtitle}</p>
+            <div style={{ fontSize: '12px', color: 'var(--color-gray-500)' }}>
+                {description}
+            </div>
         </div>
     );
 }
