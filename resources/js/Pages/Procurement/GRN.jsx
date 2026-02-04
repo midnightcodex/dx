@@ -1,105 +1,50 @@
-import React, { useState } from 'react';
-import '../../styles/dashboard.css';
+import React from 'react';
+import { Link } from '@inertiajs/react';
 import MainLayout from '../../Components/Layout/MainLayout';
 import StatsCard from '../../Components/Dashboard/StatsCard';
 import DataTable from '../../Components/Dashboard/DataTable';
-import Modal from '../../Components/UI/Modal';
-import Input from '../../Components/UI/Input';
-import Select from '../../Components/UI/Select';
 
-const grnData = [
-    { id: 1, grnNumber: 'GRN-2026-042', poNumber: 'PO-2026-040', vendor: 'Steel Corp Ltd', receiptDate: '2026-02-02', items: 1, status: 'Completed', qcStatus: 'Passed' },
-    { id: 2, grnNumber: 'GRN-2026-041', poNumber: 'PO-2026-041', vendor: 'Aluminum Traders', receiptDate: '2026-02-01', items: 2, status: 'Pending QC', qcStatus: 'Pending' },
-    { id: 3, grnNumber: 'GRN-2026-040', poNumber: 'PO-2026-039', vendor: 'Packaging Solutions', receiptDate: '2026-01-30', items: 5, status: 'Completed', qcStatus: 'Passed' },
-];
+export default function GRN({ grns, stats, filters }) {
 
-const grnColumns = [
-    { header: 'GRN Number', accessor: 'grnNumber' },
-    { header: 'PO Number', accessor: 'poNumber' },
-    { header: 'Vendor', accessor: 'vendor' },
-    { header: 'Receipt Date', accessor: 'receiptDate' },
-    { header: 'Items', accessor: 'items' },
-    {
-        header: 'QC Status', accessor: 'qcStatus', render: (val) => {
-            const colors = { Passed: '#059669', Pending: '#D97706', Failed: '#DC2626' };
-            return <span style={{ color: colors[val], fontWeight: 500 }}>● {val}</span>;
-        }
-    },
-    {
-        header: 'Status', accessor: 'status', render: (val) => {
-            const colors = { Completed: { bg: '#D1FAE5', color: '#059669' }, 'Pending QC': { bg: '#FEF3C7', color: '#D97706' } };
-            const style = colors[val] || { bg: '#F3F4F6', color: '#6B7280' };
-            return <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, backgroundColor: style.bg, color: style.color }}>{val}</span>;
-        }
-    },
-];
-
-export default function GRN() {
-    const [showModal, setShowModal] = useState(false);
-    const [formData, setFormData] = useState({ poNumber: '', warehouse: '', receivedBy: '' });
-    const [items, setItems] = useState([{ item: '', ordered: '', received: '' }]);
-
-    const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handleItemChange = (idx, field, value) => { const updated = [...items]; updated[idx][field] = value; setItems(updated); };
-
-    const handleSubmit = () => {
-        alert('GRN Created!\n' + JSON.stringify({ ...formData, items }, null, 2));
-        setShowModal(false);
-        setFormData({ poNumber: '', warehouse: '', receivedBy: '' });
-        setItems([{ item: '', ordered: '', received: '' }]);
-    };
-
-    const pendingQC = grnData.filter(g => g.qcStatus === 'Pending');
+    const grnColumns = [
+        { header: 'GRN Number', accessor: 'grn_number', render: (val, row) => <Link href={route('procurement.grn.show', row.id)} className="text-blue-600 hover:underline">{val}</Link> },
+        { header: 'PO Number', accessor: 'purchase_order.po_number' },
+        { header: 'Vendor', accessor: 'vendor.name' },
+        { header: 'Receipt Date', accessor: 'receipt_date' },
+        { header: 'Warehouse', accessor: 'warehouse.name' },
+        {
+            header: 'Status', accessor: 'status', render: (val) => {
+                const colors = {
+                    DRAFT: { bg: '#F3F4F6', color: '#6B7280' },
+                    INSPECTING: { bg: '#FEF3C7', color: '#D97706' },
+                    APPROVED: { bg: '#DBEAFE', color: '#1D4ED8' },
+                    POSTED: { bg: '#D1FAE5', color: '#059669' },
+                    CANCELLED: { bg: '#FEE2E2', color: '#991B1B' }
+                };
+                const style = colors[val] || colors.DRAFT;
+                return <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 500, backgroundColor: style.bg, color: style.color }}>{val}</span>;
+            }
+        },
+    ];
 
     return (
         <MainLayout title="Goods Receipt Notes" subtitle="Track incoming material receipts">
             <div className="stats-grid">
-                <StatsCard icon="📥" value={grnData.length} label="Total GRNs" trend="This month" variant="primary" />
-                <StatsCard icon="📦" value={1} label="Received Today" variant="success" />
-                <StatsCard icon="🔍" value={pendingQC.length} label="Pending QC" variant="warning" />
-                <StatsCard icon="✅" value="98%" label="QC Pass Rate" variant="success" />
+                <StatsCard icon="📥" value={stats.total} label="Total GRNs" variant="primary" />
+                <StatsCard icon="📦" value={stats.posted} label="Posted/Rec'd" variant="success" />
+                <StatsCard icon="🔍" value={stats.pending} label="Pending QC/Post" variant="warning" />
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-                <button onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 500, cursor: 'pointer', fontSize: '14px' }}>
+                <Link href={route('procurement.grn.create')} as="button" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', fontWeight: 500, cursor: 'pointer', fontSize: '14px', textDecoration: 'none' }}>
                     ➕ Create GRN
-                </button>
+                </Link>
                 <button style={{ padding: '12px 20px', borderRadius: '8px', border: '1px solid var(--color-gray-200)', backgroundColor: 'var(--color-white)', fontWeight: 500, cursor: 'pointer', fontSize: '14px' }}>
                     📤 Export
                 </button>
             </div>
 
-            <GRNDetailPreview />
-            <DataTable columns={grnColumns} data={grnData} title="GRN List" />
-
-            <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Create Goods Receipt Note" size="xl" footer={
-                <>
-                    <button onClick={() => setShowModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--color-gray-200)', backgroundColor: 'var(--color-white)', cursor: 'pointer' }}>Cancel</button>
-                    <button onClick={handleSubmit} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', backgroundColor: 'var(--color-primary)', color: 'white', cursor: 'pointer', fontWeight: 500 }}>Create GRN</button>
-                </>
-            }>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                    <Select label="Purchase Order" name="poNumber" value={formData.poNumber} onChange={handleInputChange} required options={[
-                        { value: 'po-041', label: 'PO-2026-041 - Aluminum Traders' },
-                        { value: 'po-042', label: 'PO-2026-042 - Steel Corp Ltd' },
-                    ]} />
-                    <Select label="Warehouse" name="warehouse" value={formData.warehouse} onChange={handleInputChange} required options={[
-                        { value: 'main', label: 'Main Warehouse' },
-                        { value: 'production', label: 'Production Floor' },
-                    ]} />
-                    <Input label="Received By" name="receivedBy" value={formData.receivedBy} onChange={handleInputChange} placeholder="Your name" />
-                </div>
-                <div>
-                    <h4 style={{ margin: '0 0 12px 0' }}>Items Received</h4>
-                    {items.map((item, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '12px', alignItems: 'end' }}>
-                            <Input label={idx === 0 ? "Item" : ""} value={item.item} onChange={(e) => handleItemChange(idx, 'item', e.target.value)} placeholder="Item name" />
-                            <Input label={idx === 0 ? "Ordered" : ""} type="number" value={item.ordered} onChange={(e) => handleItemChange(idx, 'ordered', e.target.value)} placeholder="Ordered qty" />
-                            <Input label={idx === 0 ? "Received" : ""} type="number" value={item.received} onChange={(e) => handleItemChange(idx, 'received', e.target.value)} placeholder="Received qty" />
-                        </div>
-                    ))}
-                </div>
-            </Modal>
+            <DataTable columns={grnColumns} data={grns.data} pagination={grns} title="Good Receipt Notes" />
         </MainLayout>
     );
 }

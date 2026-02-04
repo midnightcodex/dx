@@ -4,15 +4,24 @@ namespace App\Http\Controllers\Manufacturing;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Manufacturing\Models\WorkOrder;
+use App\Modules\Manufacturing\Models\WorkOrderMaterial;
 use App\Modules\Manufacturing\Models\BomHeader;
 use App\Modules\Inventory\Models\Item;
 use App\Modules\Inventory\Models\Warehouse;
+use App\Modules\Inventory\Services\InventoryPostingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 
 class WorkOrderController extends Controller
 {
+    protected InventoryPostingService $inventoryService;
+
+    public function __construct(InventoryPostingService $inventoryService)
+    {
+        $this->inventoryService = $inventoryService;
+    }
+
     /**
      * Display a listing of work orders.
      */
@@ -135,26 +144,46 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Release a work order for production.
+     * Release a work order for production (Explode BOM).
      */
     public function release(string $id)
     {
         $workOrder = WorkOrder::findOrFail($id);
 
         if ($workOrder->status !== 'PLANNED') {
-            return back()->with('error', 'Only PLANNED work orders can be released.');
+            return back()->withErrors(['status' => 'Only PLANNED work orders can be released.']);
         }
 
-        // TODO: Add material availability check here
-        // TODO: Explode BOM and create work order materials
+        return DB::transaction(function () use ($workOrder) {
+            // Explode BOM
+            $bom = BomHeader::with('lines')->findOrFail($workOrder->bom_id);
 
-        $workOrder->update([
-            'status' => 'RELEASED',
-            'released_at' => now(),
-            'released_by' => auth()->id(),
-        ]);
+            foreach ($bom->lines as $line) {
+                // Calculate required qty: (WO Qty * BOM Qty) + Scrap
+                $baseRequired = $workOrder->planned_quantity * $line->quantity_per_unit;
+                $scrapFactor = 1 + ($line->scrap_percentage / 100);
+                $totalRequired = $baseRequired * $scrapFactor;
 
-        return back()->with('message', "Work Order {$workOrder->wo_number} has been released!");
+                WorkOrderMaterial::create([
+                    'organization_id' => $workOrder->organization_id,
+                    'work_order_id' => $workOrder->id,
+                    'item_id' => $line->component_item_id,
+                    'required_quantity' => $totalRequired,
+                    'issued_quantity' => 0,
+                    'warehouse_id' => $workOrder->source_warehouse_id, // Default to source WH
+                    'operation_sequence' => $line->operation_sequence,
+                    'status' => 'PENDING',
+                ]);
+            }
+
+            $workOrder->update([
+                'status' => 'RELEASED',
+                'released_at' => now(),
+                'released_by' => auth()->id(),
+            ]);
+
+            return back()->with('message', "Work Order {$workOrder->wo_number} released. Materials have been allocated.");
+        });
     }
 
     /**
@@ -165,15 +194,117 @@ class WorkOrderController extends Controller
         $workOrder = WorkOrder::findOrFail($id);
 
         if ($workOrder->status !== 'RELEASED') {
-            return back()->with('error', 'Only RELEASED work orders can be started.');
+            return back()->withErrors(['status' => 'Only RELEASED work orders can be started.']);
         }
 
         $workOrder->update([
             'status' => 'IN_PROGRESS',
-            'actual_start_date' => now(),
+            'actual_start_at' => now(), // Corrected column name from 'actual_start_date'
         ]);
 
         return back()->with('message', "Production started on {$workOrder->wo_number}!");
+    }
+
+    /**
+     * Issue materials to the work order (Consume Stock).
+     */
+    public function issueMaterials(Request $request, string $id)
+    {
+        $request->validate([
+            'materials' => 'required|array|min:1',
+            'materials.*.id' => 'required|exists:manufacturing.work_order_materials,id',
+            'materials.*.quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        $workOrder = WorkOrder::findOrFail($id);
+
+        if (!in_array($workOrder->status, ['RELEASED', 'IN_PROGRESS'])) {
+            return back()->withErrors(['status' => 'Cannot issue materials in current status.']);
+        }
+
+        return DB::transaction(function () use ($workOrder, $request) {
+            foreach ($request->materials as $matData) {
+                $material = WorkOrderMaterial::where('work_order_id', $workOrder->id)
+                    ->lockForUpdate()
+                    ->findOrFail($matData['id']);
+
+                $qtyToIssue = $matData['quantity'];
+
+                // 1. Post Inventory Issue
+                $this->inventoryService->post(
+                    transactionType: 'ISSUE',
+                    itemId: $material->item_id,
+                    warehouseId: $material->warehouse_id,
+                    quantity: -$qtyToIssue, // Negative for issue
+                    unitCost: 0.0, // FIFO/Average cost handled by service logic (or 0 for now)
+                    referenceType: 'WORK_ORDER',
+                    referenceId: $workOrder->id,
+                    organizationId: $workOrder->organization_id
+                );
+
+                // 2. Update Consumption Record
+                $material->issued_quantity += $qtyToIssue;
+                $material->save();
+            }
+
+            return back()->with('message', 'Materials issued successfully.');
+        });
+    }
+
+    /**
+     * Complete production (Receive Finished Goods).
+     */
+    public function complete(Request $request, string $id)
+    {
+        $request->validate([
+            'completed_quantity' => 'required|numeric|min:0.0001',
+            'rejected_quantity' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $workOrder = WorkOrder::findOrFail($id);
+
+        if ($workOrder->status !== 'IN_PROGRESS') {
+            return back()->withErrors(['status' => 'Work Order must be IN PROGRESS to record output.']);
+        }
+
+        return DB::transaction(function () use ($workOrder, $request) {
+            $qtyProduced = $request->completed_quantity;
+
+            // 1. Post Inventory Receipt (Finished Goods)
+            // We need a cost for the finished good. 
+            // For now, we will use a standard cost or the sum of issued material costs. 
+            // Simplified: Use 0 or let service handle it if it supports standard cost.
+            // Better Integration: Calculate actual material cost from issued materials.
+            // For MVP: We will pass an estimated unit cost (e.g. from Item master if available) or 0.
+
+            // Fetch approximate cost from item master (if we add standard_cost later) or use 0.
+            $unitCost = 0;
+
+            $this->inventoryService->post(
+                transactionType: 'RECEIPT',
+                itemId: $workOrder->item_id,
+                warehouseId: $workOrder->target_warehouse_id,
+                quantity: $qtyProduced,
+                unitCost: $unitCost, // TODO: Implement proper costing engine
+                referenceType: 'WORK_ORDER',
+                referenceId: $workOrder->id,
+                organizationId: $workOrder->organization_id
+            );
+
+            // 2. Update Work Order
+            $workOrder->completed_quantity += $qtyProduced;
+            $workOrder->rejected_quantity += ($request->rejected_quantity ?? 0);
+
+            if ($workOrder->completed_quantity >= $workOrder->planned_quantity) {
+                $workOrder->status = 'COMPLETED';
+                $workOrder->actual_end_at = now();
+            }
+
+            $workOrder->save();
+
+            return back()->with('message', "Production recorded: {$qtyProduced} units.");
+        });
     }
 
     /**

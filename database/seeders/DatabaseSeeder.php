@@ -15,8 +15,12 @@ class DatabaseSeeder extends Seeder
             AuthSeeder::class,
             SharedSeeder::class,
             InventorySeeder::class,
-            ItemSeeder::class,
+            InventorySeeder::class,
             ManufacturingSeeder::class,
+            ProcurementSeeder::class,
+            SalesSeeder::class,
+            MaintenanceSeeder::class,
+            HrSeeder::class,
         ]);
     }
 }

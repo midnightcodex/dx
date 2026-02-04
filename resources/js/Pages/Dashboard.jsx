@@ -4,41 +4,25 @@ import StatsCard from '../Components/Dashboard/StatsCard';
 import PayrollChart from '../Components/Dashboard/PayrollChart';
 import DataTable from '../Components/Dashboard/DataTable';
 import Tabs from '../Components/UI/Tabs';
-
-// Sample data for the work orders table
-const workOrderData = [
-    { id: 1, woNumber: 'WO-2026-001', product: 'Steel Brackets', quantity: 500, status: 'In Progress', startDate: '2026-02-01' },
-    { id: 2, woNumber: 'WO-2026-002', product: 'Aluminum Plates', quantity: 1000, status: 'Pending', startDate: '2026-02-02' },
-    { id: 3, woNumber: 'WO-2026-003', product: 'Copper Wires', quantity: 250, status: 'Completed', startDate: '2026-01-30' },
-    { id: 4, woNumber: 'WO-2026-004', product: 'Plastic Housings', quantity: 750, status: 'In Progress', startDate: '2026-02-01' },
-    { id: 5, woNumber: 'WO-2026-005', product: 'Electronic PCBs', quantity: 200, status: 'Quality Check', startDate: '2026-01-29' },
-];
+import { Link, router } from '@inertiajs/react';
 
 const workOrderColumns = [
-    { header: 'S/N', accessor: 'id' },
     { header: 'WO Number', accessor: 'woNumber' },
     { header: 'Product', accessor: 'product' },
-    { header: 'Quantity', accessor: 'quantity', render: (val) => val.toLocaleString() },
+    { header: 'Qty', accessor: 'quantity' },
     {
         header: 'Status',
         accessor: 'status',
         render: (val) => {
             const statusColors = {
                 'In Progress': { bg: '#DBEAFE', color: '#1D4ED8' },
-                'Pending': { bg: '#FEF3C7', color: '#D97706' },
+                'Released': { bg: '#FEF3C7', color: '#D97706' },
                 'Completed': { bg: '#D1FAE5', color: '#059669' },
-                'Quality Check': { bg: '#EDE9FE', color: '#7C3AED' },
+                'Planned': { bg: '#F3F4F6', color: '#6B7280' },
             };
             const style = statusColors[val] || { bg: '#F3F4F6', color: '#6B7280' };
             return (
-                <span style={{
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    backgroundColor: style.bg,
-                    color: style.color
-                }}>
+                <span className="px-2 py-1 rounded text-xs font-semibold" style={{ backgroundColor: style.bg, color: style.color }}>
                     {val}
                 </span>
             );
@@ -47,157 +31,167 @@ const workOrderColumns = [
     { header: 'Start Date', accessor: 'startDate' },
 ];
 
-// Inventory data for second tab
-const inventoryData = [
-    { id: 1, itemCode: 'RM-001', name: 'Raw Steel', warehouse: 'Main', quantity: 5000, unit: 'kg', reorderLevel: 1000 },
-    { id: 2, itemCode: 'RM-002', name: 'Aluminum Sheets', warehouse: 'Main', quantity: 2500, unit: 'sheets', reorderLevel: 500 },
-    { id: 3, itemCode: 'RM-003', name: 'Copper Wire 2mm', warehouse: 'Production', quantity: 800, unit: 'm', reorderLevel: 200 },
-    { id: 4, itemCode: 'FG-001', name: 'Steel Brackets A1', warehouse: 'Finished Goods', quantity: 1200, unit: 'pcs', reorderLevel: 300 },
-    { id: 5, itemCode: 'FG-002', name: 'Aluminum Plates B2', warehouse: 'Finished Goods', quantity: 450, unit: 'pcs', reorderLevel: 100 },
-];
-
 const inventoryColumns = [
-    { header: 'S/N', accessor: 'id' },
     { header: 'Item Code', accessor: 'itemCode' },
     { header: 'Name', accessor: 'name' },
-    { header: 'Warehouse', accessor: 'warehouse' },
-    { header: 'Quantity', accessor: 'quantity', render: (val) => val.toLocaleString() },
+    { header: 'Total Qty', accessor: 'quantity', render: (val) => Number(val).toLocaleString() },
     { header: 'Unit', accessor: 'unit' },
     {
-        header: 'Stock Status',
+        header: 'Status',
         accessor: 'quantity',
         render: (val, row) => {
-            const isLow = val <= row.reorderLevel;
+            const isLow = row.reorderLevel > 0 && val <= row.reorderLevel;
             return (
-                <span style={{
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    backgroundColor: isLow ? '#FEE2E2' : '#D1FAE5',
-                    color: isLow ? '#DC2626' : '#059669'
-                }}>
-                    {isLow ? 'Low Stock' : 'In Stock'}
+                <span className={`px-2 py-1 rounded text-xs font-semibold ${isLow ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                    {isLow ? 'Low Stock' : 'Good'}
                 </span>
             );
         }
     },
 ];
 
+const salesColumns = [
+    { header: 'SO Number', accessor: 'soNumber' },
+    { header: 'Customer', accessor: 'customer' },
+    { header: 'Amount', accessor: 'amount', render: (val) => `₹${Number(val).toFixed(2)}` },
+    {
+        header: 'Status',
+        accessor: 'status',
+        render: (val) => (
+            <span className={`px-2 py-1 rounded text-xs font-semibold ${val === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}>
+                {val}
+            </span>
+        )
+    },
+    { header: 'Date', accessor: 'date' },
+];
+
 export default function Dashboard({ stats, tables }) {
     const tabs = [
         {
-            label: 'Work Orders',
-            content: <DataTable columns={workOrderColumns} data={tables.workOrders} title="Recent Work Orders" actions={false} />
+            label: 'Recent Work Orders',
+            content: <DataTable columns={workOrderColumns} data={tables.workOrders} title="Work Orders" actions={false} />
         },
         {
             label: 'Inventory',
             content: <DataTable columns={inventoryColumns} data={tables.inventory} title="Recent Items" actions={false} />
         },
-        // ... keeping other tabs as placeholders for now ...
         {
-            label: 'Quality Inspections',
-            badge: stats.qualityIssues,
-            content: (
-                <div style={{
-                    textAlign: 'center',
-                    padding: '48px',
-                    color: 'var(--color-gray-500)'
-                }}>
-                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔍</span>
-                    <p>{stats.qualityIssues} inspections pending review</p>
-                </div>
-            )
+            label: 'Recent Sales',
+            content: <DataTable columns={salesColumns} data={tables.salesOrders} title="Sales Orders" actions={false} />
         },
         {
-            label: 'Maintenance',
+            label: 'Quality',
+            badge: stats.qualityIssues,
             content: (
-                <div style={{
-                    textAlign: 'center',
-                    padding: '48px',
-                    color: 'var(--color-gray-500)'
-                }}>
-                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🔧</span>
-                    <p>All equipment operational</p>
+                <div className="text-center p-12 text-gray-500">
+                    <span className="text-4xl block mb-4">🔍</span>
+                    <p>{stats.qualityIssues} inspections pending review</p>
                 </div>
             )
         },
     ];
 
     return (
-        <MainLayout
-            title="Manufacturing Dashboard"
-            subtitle="Real-time production and inventory overview"
-        >
+        <MainLayout title="Dashboard" subtitle="Overview">
             {/* Stats Cards */}
             <div className="stats-grid">
                 <StatsCard
                     icon="⚙️"
                     value={stats.activeWorkOrders}
                     label="Active Work Orders"
-                    trend="Real-time"
-                    trendDirection="neutral"
+                    trend="Currently Running"
                     variant="primary"
-                    animationDelay={0}
                 />
                 <StatsCard
                     icon="📦"
-                    value={stats.totalItems}
-                    label="Total Items"
-                    trend="In Database"
-                    trendDirection="neutral"
-                    variant="success"
-                    animationDelay={100}
+                    value={stats.lowStockItems}
+                    label="Low Stock Items"
+                    trend="Requires Reorder"
+                    variant={stats.lowStockItems > 0 ? "danger" : "success"}
+                />
+                <StatsCard
+                    icon="💰"
+                    value={stats.pendingSalesOrders}
+                    label="Pending Shipments"
+                    trend="To Ship"
+                    variant="warning"
                 />
                 <StatsCard
                     icon="🛒"
                     value={stats.pendingPOs}
-                    label="Pending POs"
-                    trend=" Procurement"
-                    trendDirection="neutral"
-                    variant="warning"
-                    animationDelay={200}
+                    label="Pending Purchases"
+                    trend="Processing"
+                    variant="info"
                 />
                 <StatsCard
-                    icon="⚠️"
-                    value={stats.qualityIssues}
-                    label="Quality Issues"
+                    icon="🔧"
+                    value={stats.openTickets}
+                    label="Open Tickets"
                     trend="Requires Attention"
-                    trendDirection="down"
-                    variant="danger"
-                    animationDelay={300}
+                    variant={stats.openTickets > 0 ? "danger" : "success"}
+                />
+                <StatsCard
+                    icon="🏖️"
+                    value={stats.pendingLeaves}
+                    label="Leave Requests"
+                    trend="Needing Approval"
+                    variant="warning"
+                />
+                <StatsCard
+                    icon="👥"
+                    value={stats.totalEmployees}
+                    label="Total Workforce"
+                    trend="Active"
+                    variant="primary"
                 />
             </div>
 
             {/* Chart Section */}
             <div className="dashboard-grid">
-                <PayrollChart title="Production Output (Projected)" />
+                <PayrollChart title="Weekly Production Output" />
 
                 {/* Quick Actions Card */}
                 <div className="chart-container">
                     <div className="chart-header">
                         <h3 className="chart-title">Quick Actions</h3>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div className="grid grid-cols-2 gap-4">
                         <QuickActionCard
                             icon="📝"
-                            title="Create Work Order"
-                            description="Start new production"
+                            title="Create WO"
+                            description="New Production"
+                            href={route('manufacturing.work-orders.create')}
                         />
                         <QuickActionCard
                             icon="📦"
-                            title="New Item"
-                            description="Register inventory"
+                            title="Add Item"
+                            description="New Inventory"
+                            href={route('inventory.items.create')}
                         />
                         <QuickActionCard
-                            icon="🔍"
-                            title="Stock Check"
-                            description="Audit warehouse"
+                            icon="🛒"
+                            title="Create PO"
+                            description="Buy Material"
+                            href={route('procurement.purchase-orders.create')}
                         />
                         <QuickActionCard
-                            icon="📊"
-                            title="Reports"
-                            description="View analytics"
+                            icon="🛍️"
+                            title="Sales Order"
+                            description="New Sale"
+                            href={route('sales.orders.create')}
+                        />
+                        <QuickActionCard
+                            icon="🔧"
+                            title="Report Issue"
+                            description="Maintenance"
+                            href={route('maintenance.tickets.index')}
+                        />
+                        <QuickActionCard
+                            icon="👥"
+                            title="Onboard"
+                            description="New Employee"
+                            href={route('hr.employees.create')}
                         />
                     </div>
                 </div>
@@ -209,32 +203,12 @@ export default function Dashboard({ stats, tables }) {
     );
 }
 
-function QuickActionCard({ icon, title, description }) {
+function QuickActionCard({ icon, title, description, href }) {
     return (
-        <div style={{
-            padding: '16px',
-            borderRadius: '12px',
-            border: '1px solid var(--color-gray-200)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            backgroundColor: 'var(--color-white)'
-        }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-gray-50)';
-                e.currentTarget.style.borderColor = 'var(--color-primary)';
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--color-white)';
-                e.currentTarget.style.borderColor = 'var(--color-gray-200)';
-            }}
-        >
-            <span style={{ fontSize: '24px', display: 'block', marginBottom: '8px' }}>{icon}</span>
-            <div style={{ fontWeight: 600, color: 'var(--color-gray-900)', marginBottom: '4px' }}>
-                {title}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--color-gray-500)' }}>
-                {description}
-            </div>
-        </div>
+        <Link href={href} className="block p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-indigo-500 transition-all">
+            <span className="text-2xl block mb-2">{icon}</span>
+            <div className="font-semibold text-gray-900">{title}</div>
+            <div className="text-xs text-gray-500">{description}</div>
+        </Link>
     );
 }
