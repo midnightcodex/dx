@@ -116,6 +116,22 @@ class WorkOrder extends Model
     }
 
     /**
+     * Get the user who created this work order.
+     */
+    public function createdBy()
+    {
+        return $this->belongsTo(\App\Modules\Auth\Models\User::class, 'created_by');
+    }
+
+    /**
+     * Get the user who last updated this work order.
+     */
+    public function updatedBy()
+    {
+        return $this->belongsTo(\App\Modules\Auth\Models\User::class, 'updated_by');
+    }
+
+    /**
      * Calculate completion percentage.
      */
     public function getCompletionPercentageAttribute(): float

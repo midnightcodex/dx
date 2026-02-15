@@ -57,7 +57,8 @@ class InventoryPostingService
     ): StockTransaction {
 
         return DB::transaction(function () use ($transactionType, $itemId, $warehouseId, $quantity, $unitCost, $referenceType, $referenceId, $batchId, $organizationId) {
-            $orgId = $organizationId ?? auth()->user()->organization_id;
+            $orgId = $this->resolveOrganizationId($organizationId);
+            $this->enableInventoryPostingContext();
 
             // 1. VALIDATE BUSINESS RULES
             $this->validatePosting($itemId, $warehouseId, $quantity, $batchId, $orgId);
@@ -88,7 +89,7 @@ class InventoryPostingService
             $newQty = (float) $ledger->quantity_available + $quantity;
 
             // Check negative stock
-            $warehouse = Warehouse::find($warehouseId);
+            $warehouse = Warehouse::where('organization_id', $orgId)->find($warehouseId);
             if ($newQty < 0 && !$warehouse->allow_negative_stock) {
                 throw new \RuntimeException(
                     "Insufficient stock. Available: {$ledger->quantity_available}, " .
@@ -148,17 +149,24 @@ class InventoryPostingService
      * 
      * @return StockTransaction The reversal transaction
      */
-    public function cancelTransaction(string $transactionId, string $reason): StockTransaction
+    public function cancelTransaction(string $transactionId, string $reason, ?string $organizationId = null): StockTransaction
     {
-        $original = StockTransaction::findOrFail($transactionId);
+        $orgId = $this->resolveOrganizationId($organizationId);
+
+        $original = StockTransaction::query()
+            ->where('organization_id', $orgId)
+            ->findOrFail($transactionId);
 
         if ($original->is_cancelled) {
             throw new \RuntimeException("Transaction is already cancelled.");
         }
 
         return DB::transaction(function () use ($original, $reason) {
+            $this->enableInventoryPostingContext();
+
             // Mark original as cancelled (metadata only - not changing the fact)
             DB::table('inventory.stock_transactions')
+                ->where('organization_id', $original->organization_id)
                 ->where('id', $original->id)
                 ->update([
                     'is_cancelled' => true,
@@ -189,10 +197,15 @@ class InventoryPostingService
         float $quantity,
         string $referenceType,
         string $referenceId,
-        ?string $batchId = null
+        ?string $batchId = null,
+        ?string $organizationId = null
     ): void {
-        DB::transaction(function () use ($itemId, $warehouseId, $quantity, $batchId) {
-            $ledger = StockLedger::where('item_id', $itemId)
+        DB::transaction(function () use ($itemId, $warehouseId, $quantity, $batchId, $organizationId) {
+            $orgId = $this->resolveOrganizationId($organizationId);
+            $this->enableInventoryPostingContext();
+
+            $ledger = StockLedger::where('organization_id', $orgId)
+                ->where('item_id', $itemId)
                 ->where('warehouse_id', $warehouseId)
                 ->where('batch_id', $batchId)
                 ->lockForUpdate()
@@ -218,10 +231,15 @@ class InventoryPostingService
         string $itemId,
         string $warehouseId,
         float $quantity,
-        ?string $batchId = null
+        ?string $batchId = null,
+        ?string $organizationId = null
     ): void {
-        DB::transaction(function () use ($itemId, $warehouseId, $quantity, $batchId) {
-            $ledger = StockLedger::where('item_id', $itemId)
+        DB::transaction(function () use ($itemId, $warehouseId, $quantity, $batchId, $organizationId) {
+            $orgId = $this->resolveOrganizationId($organizationId);
+            $this->enableInventoryPostingContext();
+
+            $ledger = StockLedger::where('organization_id', $orgId)
+                ->where('item_id', $itemId)
                 ->where('warehouse_id', $warehouseId)
                 ->where('batch_id', $batchId)
                 ->lockForUpdate()
@@ -235,9 +253,17 @@ class InventoryPostingService
     /**
      * Get current stock for an item in a warehouse.
      */
-    public function getStock(string $itemId, string $warehouseId, ?string $batchId = null): array
+    public function getStock(
+        string $itemId,
+        string $warehouseId,
+        ?string $batchId = null,
+        ?string $organizationId = null
+    ): array
     {
-        $ledger = StockLedger::where('item_id', $itemId)
+        $orgId = $this->resolveOrganizationId($organizationId);
+
+        $ledger = StockLedger::where('organization_id', $orgId)
+            ->where('item_id', $itemId)
             ->where('warehouse_id', $warehouseId)
             ->where('batch_id', $batchId)
             ->first();
@@ -269,6 +295,10 @@ class InventoryPostingService
         ?string $batchId,
         string $organizationId
     ): void {
+        if ($quantity == 0.0) {
+            throw new \RuntimeException("Transaction quantity cannot be zero.");
+        }
+
         // Validate item exists and is active
         $item = Item::where('id', $itemId)
             ->where('organization_id', $organizationId)
@@ -296,6 +326,7 @@ class InventoryPostingService
 
         if ($batchId) {
             $batch = Batch::where('id', $batchId)
+                ->where('organization_id', $organizationId)
                 ->where('item_id', $itemId)
                 ->first();
 
@@ -324,5 +355,29 @@ class InventoryPostingService
         $newValue = $newQty * $newCost;
 
         return ($existingValue + $newValue) / $totalQty;
+    }
+
+    /**
+     * Resolve organization id from explicit value or authenticated user.
+     */
+    protected function resolveOrganizationId(?string $organizationId = null): string
+    {
+        $orgId = $organizationId ?? auth()->user()?->organization_id;
+
+        if (!$orgId) {
+            throw new \RuntimeException('Organization context is required for inventory posting.');
+        }
+
+        return $orgId;
+    }
+
+    /**
+     * Mark current DB transaction as authorized inventory posting context.
+     */
+    protected function enableInventoryPostingContext(): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement("SET LOCAL app.inventory_posting = '1'");
+        }
     }
 }

@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -11,6 +12,8 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        $useForeignKeys = DB::getDriverName() !== 'sqlite';
+
         // Warehouses / Storage Locations
         Schema::create('inventory.warehouses', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -130,7 +133,7 @@ return new class extends Migration {
         });
 
         // Batch Movements (traceability view)
-        Schema::create('inventory.batch_movements', function (Blueprint $table) {
+        Schema::create('inventory.batch_movements', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('batch_id');
@@ -142,7 +145,9 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->index(['organization_id', 'batch_id']);
-            $table->foreign('stock_transaction_id')->references('id')->on('inventory.stock_transactions');
+            if ($useForeignKeys) {
+                $table->foreign('stock_transaction_id')->references('id')->on('inventory.stock_transactions');
+            }
         });
 
         // Stock Adjustments (document for controlled corrections)
@@ -165,7 +170,7 @@ return new class extends Migration {
         });
 
         // Stock Adjustment Lines
-        Schema::create('inventory.stock_adjustment_lines', function (Blueprint $table) {
+        Schema::create('inventory.stock_adjustment_lines', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('stock_adjustment_id');
@@ -178,7 +183,9 @@ return new class extends Migration {
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('stock_adjustment_id')->references('id')->on('inventory.stock_adjustments')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('stock_adjustment_id')->references('id')->on('inventory.stock_adjustments')->onDelete('cascade');
+            }
             $table->index(['organization_id', 'item_id']);
         });
     }

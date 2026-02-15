@@ -55,7 +55,19 @@ class AuthSeeder extends Seeder
         $this->command->info('Roles checked/created: ' . implode(', ', array_keys($roles)));
 
         // 3. Create Permissions (using 'slug' not 'code', no organization_id)
-        $modules = ['auth', 'inventory', 'manufacturing', 'procurement', 'sales'];
+        $modules = [
+            'auth',
+            'shared',
+            'inventory',
+            'manufacturing',
+            'procurement',
+            'sales',
+            'maintenance',
+            'hr',
+            'compliance',
+            'integrations',
+            'reports',
+        ];
         $actions = ['view', 'create', 'edit', 'delete', 'approve'];
 
         foreach ($modules as $module) {

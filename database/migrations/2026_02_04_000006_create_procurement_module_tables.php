@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -10,6 +11,8 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        $useForeignKeys = DB::getDriverName() !== 'sqlite';
+
         // Vendors / Suppliers
         Schema::create('procurement.vendors', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -69,7 +72,7 @@ return new class extends Migration {
         });
 
         // Purchase Order Lines
-        Schema::create('procurement.purchase_order_lines', function (Blueprint $table) {
+        Schema::create('procurement.purchase_order_lines', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('purchase_order_id');
@@ -88,7 +91,9 @@ return new class extends Migration {
             $table->date('expected_date')->nullable();
             $table->timestamps();
 
-            $table->foreign('purchase_order_id')->references('id')->on('procurement.purchase_orders')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('purchase_order_id')->references('id')->on('procurement.purchase_orders')->onDelete('cascade');
+            }
             $table->unique(['purchase_order_id', 'line_number']);
             $table->index(['organization_id', 'item_id']);
         });
@@ -117,7 +122,7 @@ return new class extends Migration {
         });
 
         // GRN Lines
-        Schema::create('procurement.grn_lines', function (Blueprint $table) {
+        Schema::create('procurement.grn_lines', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('grn_id');
@@ -136,7 +141,9 @@ return new class extends Migration {
             $table->string('quality_status', 20)->default('PENDING'); // 'PENDING', 'PASSED', 'FAILED', 'PARTIAL'
             $table->timestamps();
 
-            $table->foreign('grn_id')->references('id')->on('procurement.goods_receipt_notes')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('grn_id')->references('id')->on('procurement.goods_receipt_notes')->onDelete('cascade');
+            }
             $table->index(['organization_id', 'item_id']);
         });
 
@@ -160,7 +167,7 @@ return new class extends Migration {
         });
 
         // Purchase Requisition Lines
-        Schema::create('procurement.purchase_requisition_lines', function (Blueprint $table) {
+        Schema::create('procurement.purchase_requisition_lines', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('requisition_id');
@@ -172,7 +179,9 @@ return new class extends Migration {
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('requisition_id')->references('id')->on('procurement.purchase_requisitions')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('requisition_id')->references('id')->on('procurement.purchase_requisitions')->onDelete('cascade');
+            }
         });
     }
 

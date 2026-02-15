@@ -33,6 +33,7 @@ class User extends Authenticatable
         'phone',
         'avatar_url',
         'is_active',
+        'token_version',
     ];
 
     protected $hidden = [
@@ -45,6 +46,7 @@ class User extends Authenticatable
         'last_login_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
+        'token_version' => 'integer',
     ];
 
     /**

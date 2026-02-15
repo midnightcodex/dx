@@ -1,38 +1,37 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Modules\Auth\Controllers\AuthController;
-use App\Modules\Inventory\Controllers\ItemController;
-use App\Modules\Manufacturing\Controllers\WorkOrderController;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
+| These routes are loaded by the RouteServiceProvider and all are in the
+| "api" middleware group. Keep module routes split under routes/api/.
+|--------------------------------------------------------------------------
 */
 
-// Auth Routes (Public)
-Route::post('/auth/login', [AuthController::class, 'login']);
+require __DIR__ . '/api/auth.php';
+require __DIR__ . '/api/shared.php';
+require __DIR__ . '/api/inventory.php';
+require __DIR__ . '/api/inventory_extra.php';
+require __DIR__ . '/api/manufacturing.php';
+require __DIR__ . '/api/manufacturing_extra.php';
+require __DIR__ . '/api/procurement.php';
+require __DIR__ . '/api/sales.php';
+require __DIR__ . '/api/maintenance.php';
+require __DIR__ . '/api/hr.php';
+require __DIR__ . '/api/compliance.php';
+require __DIR__ . '/api/integrations.php';
+require __DIR__ . '/api/reports.php';
 
-// Protected Routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::fallback(function () {
+    $requestId = request()?->attributes?->get('request_id') ?? request()?->header('X-Request-Id');
 
-    // Auth
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-
-    // Inventory - Items
-    Route::apiResource('inventory/items', ItemController::class);
-
-    // Manufacturing - Work Orders
-    Route::get('manufacturing/work-orders', [WorkOrderController::class, 'index']);
-    Route::post('manufacturing/work-orders', [WorkOrderController::class, 'store']);
-    Route::get('manufacturing/work-orders/{id}', [WorkOrderController::class, 'show']);
-    Route::post('manufacturing/work-orders/{id}/release', [WorkOrderController::class, 'release']);
+    return response()->json([
+        'success' => false,
+        'message' => 'Not Found.',
+        'error_code' => \App\Core\Errors\ErrorCodes::NOT_FOUND,
+        'request_id' => $requestId,
+    ], 404);
 });

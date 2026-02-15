@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -11,6 +12,8 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        $useForeignKeys = DB::getDriverName() !== 'sqlite';
+
         // Organizations table (multi-tenancy foundation)
         Schema::create('shared.organizations', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -79,26 +82,30 @@ return new class extends Migration {
         });
 
         // Role-Permission pivot
-        Schema::create('auth.role_permissions', function (Blueprint $table) {
+        Schema::create('auth.role_permissions', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('role_id');
             $table->uuid('permission_id');
             $table->timestamps();
 
-            $table->foreign('role_id')->references('id')->on('auth.roles')->onDelete('cascade');
-            $table->foreign('permission_id')->references('id')->on('auth.permissions')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('role_id')->references('id')->on('auth.roles')->onDelete('cascade');
+                $table->foreign('permission_id')->references('id')->on('auth.permissions')->onDelete('cascade');
+            }
             $table->unique(['role_id', 'permission_id']);
         });
 
         // User-Role pivot
-        Schema::create('auth.user_roles', function (Blueprint $table) {
+        Schema::create('auth.user_roles', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('user_id');
             $table->uuid('role_id');
             $table->timestamps();
 
-            $table->foreign('user_id')->references('id')->on('auth.users')->onDelete('cascade');
-            $table->foreign('role_id')->references('id')->on('auth.roles')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('user_id')->references('id')->on('auth.users')->onDelete('cascade');
+                $table->foreign('role_id')->references('id')->on('auth.roles')->onDelete('cascade');
+            }
             $table->unique(['user_id', 'role_id']);
         });
 

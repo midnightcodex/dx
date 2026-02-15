@@ -6,34 +6,33 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Modules\Auth\Models\User;
+use App\Modules\Auth\Services\AuthService;
+use App\Core\Errors\ErrorCodes;
 
 class AuthController extends Controller
 {
     /**
      * Handle an authentication attempt.
      */
-    public function login(Request $request)
+    public function login(Request $request, AuthService $authService)
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
+        $data = $authService->login($credentials['email'], $credentials['password']);
 
-            $user = Auth::user()->load(['roles.permissions', 'organization']);
-
-            return response()->json([
-                'message' => 'Login successful',
-                'user' => $user,
-                'token' => $user->createToken('api_token')->plainTextToken, // Assuming Sanctum
-            ]);
+        if (!$data) {
+            return $this->error(
+                'The provided credentials do not match our records.',
+                401,
+                null,
+                ErrorCodes::INVALID_CREDENTIALS
+            );
         }
 
-        return response()->json([
-            'message' => 'The provided credentials do not match our records.',
-        ], 401);
+        return $this->success($data, 'Login successful');
     }
 
     /**
@@ -74,9 +73,9 @@ class AuthController extends Controller
      */
     public function me(Request $request)
     {
-        return response()->json([
-            'user' => $request->user()->load(['roles.permissions', 'organization']),
-        ]);
+        return $this->success([
+            'user' => app(AuthService::class)->loadUser($request->user()),
+        ], 'User retrieved');
     }
 
     /**
@@ -84,12 +83,14 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        // Revoke the token that was used to authenticate the current request
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        if (!$user) {
+            return $this->error('Unauthenticated.', 401, null, ErrorCodes::UNAUTHENTICATED);
+        }
 
-        Auth::guard('web')->logout();
+        app(AuthService::class)->logout($user);
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return $this->success(null, 'Logged out successfully');
     }
     /**
      * Handle registration for Web.

@@ -10,6 +10,34 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        // SQLite test support: attach in-memory databases as schema aliases.
+        if (DB::getDriverName() === 'sqlite') {
+            $schemas = [
+                'auth',
+                'shared',
+                'inventory',
+                'manufacturing',
+                'procurement',
+                'sales',
+            ];
+
+            foreach ($schemas as $schema) {
+                try {
+                    DB::statement("ATTACH DATABASE ':memory:' AS \"{$schema}\"");
+                } catch (\Throwable $e) {
+                    if (!str_contains(strtolower($e->getMessage()), 'already in use')) {
+                        throw $e;
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Create schemas for each ERP module
         $schemas = [
             'auth',           // Authentication & Authorization
@@ -33,6 +61,10 @@ return new class extends Migration {
      */
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         $schemas = [
             'compliance',
             'hr',

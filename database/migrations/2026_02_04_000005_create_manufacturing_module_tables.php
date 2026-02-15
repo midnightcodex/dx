@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
@@ -10,6 +11,8 @@ return new class extends Migration {
      */
     public function up(): void
     {
+        $useForeignKeys = DB::getDriverName() !== 'sqlite';
+
         // Work Centers (machines/stations)
         Schema::create('manufacturing.work_centers', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -44,7 +47,7 @@ return new class extends Migration {
         });
 
         // Routing Operations (steps in a routing)
-        Schema::create('manufacturing.routing_operations', function (Blueprint $table) {
+        Schema::create('manufacturing.routing_operations', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('routing_id');
@@ -58,7 +61,9 @@ return new class extends Migration {
             $table->text('instructions')->nullable();
             $table->timestamps();
 
-            $table->foreign('routing_id')->references('id')->on('manufacturing.routings')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('routing_id')->references('id')->on('manufacturing.routings')->onDelete('cascade');
+            }
             $table->unique(['routing_id', 'sequence']);
         });
 
@@ -86,7 +91,7 @@ return new class extends Migration {
         });
 
         // BOM Lines (components)
-        Schema::create('manufacturing.bom_lines', function (Blueprint $table) {
+        Schema::create('manufacturing.bom_lines', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('bom_header_id');
@@ -101,7 +106,9 @@ return new class extends Migration {
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('bom_header_id')->references('id')->on('manufacturing.bom_headers')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('bom_header_id')->references('id')->on('manufacturing.bom_headers')->onDelete('cascade');
+            }
             $table->unique(['bom_header_id', 'line_number']);
             $table->index(['organization_id', 'component_item_id']);
         });
@@ -138,7 +145,7 @@ return new class extends Migration {
         });
 
         // Work Order Materials (required components)
-        Schema::create('manufacturing.work_order_materials', function (Blueprint $table) {
+        Schema::create('manufacturing.work_order_materials', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('work_order_id');
@@ -153,12 +160,14 @@ return new class extends Migration {
             $table->string('status', 20)->default('PENDING'); // 'PENDING', 'ISSUED', 'CONSUMED'
             $table->timestamps();
 
-            $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders')->onDelete('cascade');
+            }
             $table->index(['organization_id', 'item_id']);
         });
 
         // Work Order Operations (steps to complete)
-        Schema::create('manufacturing.work_order_operations', function (Blueprint $table) {
+        Schema::create('manufacturing.work_order_operations', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('work_order_id');
@@ -175,12 +184,14 @@ return new class extends Migration {
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders')->onDelete('cascade');
+            }
             $table->unique(['work_order_id', 'sequence']);
         });
 
         // Production Logs (actual work recorded)
-        Schema::create('manufacturing.production_logs', function (Blueprint $table) {
+        Schema::create('manufacturing.production_logs', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('work_order_id');
@@ -195,7 +206,9 @@ return new class extends Migration {
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders');
+            if ($useForeignKeys) {
+                $table->foreign('work_order_id')->references('id')->on('manufacturing.work_orders');
+            }
             $table->index(['organization_id', 'work_order_id']);
             $table->index(['organization_id', 'production_date']);
         });
@@ -219,7 +232,7 @@ return new class extends Migration {
         });
 
         // Production Plan Items
-        Schema::create('manufacturing.production_plan_items', function (Blueprint $table) {
+        Schema::create('manufacturing.production_plan_items', function (Blueprint $table) use ($useForeignKeys) {
             $table->uuid('id')->primary();
             $table->uuid('organization_id');
             $table->uuid('production_plan_id');
@@ -233,7 +246,9 @@ return new class extends Migration {
             $table->boolean('work_orders_generated')->default(false);
             $table->timestamps();
 
-            $table->foreign('production_plan_id')->references('id')->on('manufacturing.production_plans')->onDelete('cascade');
+            if ($useForeignKeys) {
+                $table->foreign('production_plan_id')->references('id')->on('manufacturing.production_plans')->onDelete('cascade');
+            }
             $table->unique(['production_plan_id', 'item_id', 'scheduled_start_date']);
         });
     }
